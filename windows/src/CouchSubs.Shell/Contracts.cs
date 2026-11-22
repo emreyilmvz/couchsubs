@@ -210,7 +210,7 @@ public static class TranslationEngines
 /// oyun bu bilgisayardaki PS Remote Play'de ya da chiaki-ng'de oynanır, CouchSubs yalnız o pencereyi okur; PS5'e ikinci
 /// oturum açılmadığı için ikinci hesap gerekmez (Mac'teki FrameSource ile aynı). Eski ayar dosyaları PS5 ile açılır.
 /// </summary>
-public enum FrameSource { Ps5, RemotePlayWindow, CaptureWindow }
+public enum FrameSource { Ps5, RemotePlayWindow, CaptureWindow, VideoDevice }
 
 /// <summary>
 /// Xbox seçiliyken görüntünün nereden okunduğu (#853; Mac'teki XboxFrameSource ile aynı). <c>Xbox</c>: CouchSubs Xbox'a
@@ -443,6 +443,7 @@ public sealed record UserSettings
     public bool XboxAudioOnComputer { get; init; } = true;
     /// <summary>OBS veya başka bir açık pencere seçildiyse yalnız bu pencere yakalanır (varsayılan null).</summary>
     public WindowCaptureTarget? CaptureWindow { get; init; }
+    public string VideoDeviceName { get; init; } = "Veyra Virtual Camera";
     /// <summary>Pencereden okunurken hangi Remote Play uygulaması (bkz. <see cref="Shell.RemotePlayApp"/>).</summary>
     public RemotePlayApp RemotePlayApp { get; init; } = RemotePlayApp.Automatic;
     /// <summary>
@@ -800,6 +801,7 @@ public interface IAppServices
     IStreamSession MakeWindowStream(RemotePlayApp app) => throw new NotSupportedException();
     /// <summary>Açıkça seçilen pencereyi okumak için aynı Windows Graphics Capture hattını kullanır.</summary>
     IStreamSession MakeCaptureWindowStream(WindowCaptureTarget target) => throw new NotSupportedException();
+    IStreamSession MakeVideoDeviceStream(string deviceName) => throw new NotSupportedException();
     /// <summary>
     /// Deneme modunun "konsolu": uygulamadaki örnek kareleri akış gibi verir, ağ kullanmaz. Uygulama katmanı kareleri
     /// çizer (WPF); varsayılanı yazısız düz karedir.

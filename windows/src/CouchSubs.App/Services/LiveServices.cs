@@ -132,6 +132,7 @@ public sealed class LiveServices : IAppServices
     public IStreamSession MakeWindowStream(RemotePlayApp app) => new RemotePlayWindowStream(app);
     public IStreamSession MakeDemoStream() => new DemoStream(DemoFrameRenderer.Render);
     public IStreamSession MakeCaptureWindowStream(WindowCaptureTarget target) => new RemotePlayWindowStream(target);
+    public IStreamSession MakeVideoDeviceStream(string deviceName) => new VideoDeviceStream(deviceName);
     public IReadOnlyList<WindowCaptureTarget> CaptureWindows() => RemotePlayWindowStream.ListCaptureWindows();
     public bool RemotePlayInstalled(RemotePlayApp app) => RemotePlayWindowStream.IsInstalled(app);
 

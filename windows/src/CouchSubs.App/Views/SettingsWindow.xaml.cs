@@ -164,7 +164,7 @@ public partial class SettingsWindow : Window
         var settings = controller.Settings;
         var selectedTag = xbox ? (settings.XboxFrameSource == XboxFrameSource.CaptureWindow ? "CaptureWindow" : "Xbox") : settings.FrameSource.ToString();
         XboxSourceItem.Visibility = xbox ? Visibility.Visible : Visibility.Collapsed;
-        Ps5SourceItem.Visibility = RemotePlaySourceItem.Visibility = xbox ? Visibility.Collapsed : Visibility.Visible;
+        Ps5SourceItem.Visibility = RemotePlaySourceItem.Visibility = VideoDeviceSourceItem.Visibility = xbox ? Visibility.Collapsed : Visibility.Visible;
         var wasLoading = loading;
         loading = true;
         FrameSourceChoice.SelectedItem = FrameSourceChoice.Items.Cast<ComboBoxItem>().First(item => (string)item.Tag == selectedTag);
@@ -176,8 +176,11 @@ public partial class SettingsWindow : Window
         RemotePlayAppPanel.Visibility = window ? Visibility.Visible : Visibility.Collapsed;
         WindowSourceHint.Visibility = window ? Visibility.Visible : Visibility.Collapsed;
         CaptureWindowPanel.Visibility = capture ? Visibility.Visible : Visibility.Collapsed;
+        var videoDevice = !xbox && settings.FrameSource == FrameSource.VideoDevice;
+        VideoDevicePanel.Visibility = videoDevice ? Visibility.Visible : Visibility.Collapsed;
+        if (videoDevice) VideoDeviceName.Text = settings.VideoDeviceName;
         if (capture) RefreshCaptureWindows();
-        Ps5SourceHint.Visibility = xbox || window || capture ? Visibility.Collapsed : Visibility.Visible;
+        Ps5SourceHint.Visibility = xbox || window || capture || videoDevice ? Visibility.Collapsed : Visibility.Visible;
         SonyInstallRow.Visibility = ChiakiInstallRow.Visibility = window ? Visibility.Visible : Visibility.Collapsed;
         var sony = controller.RemotePlayInstalled(RemotePlayApp.Sony);
         var chiaki = controller.RemotePlayInstalled(RemotePlayApp.Chiaki);
@@ -257,6 +260,13 @@ public partial class SettingsWindow : Window
     {
         if (RemotePlayAppChoice.SelectedItem is ComboBoxItem { Tag: string tag })
             Update(s => s with { RemotePlayApp = Enum.Parse<RemotePlayApp>(tag) });
+    }
+
+    private void OnVideoDeviceNameChanged(object sender, KeyboardFocusChangedEventArgs e)
+    {
+        if (loading || controller.Settings.FrameSource != FrameSource.VideoDevice) return;
+        var name = VideoDeviceName.Text.Trim();
+        if (name != controller.Settings.VideoDeviceName) Update(s => s with { VideoDeviceName = name });
     }
 
     private bool refreshingCaptureWindows;

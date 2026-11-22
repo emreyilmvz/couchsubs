@@ -707,6 +707,7 @@
                                     <ComboBoxItem x:Name="Ps5SourceItem" Content="{t:T 'The PS5 (second account)'}" Tag="Ps5" />
                                     <ComboBoxItem x:Name="RemotePlaySourceItem" Content="{t:T 'Remote Play window on this PC'}" Tag="RemotePlayWindow" />
                                     <ComboBoxItem Content="{t:T 'OBS projector or game window'}" Tag="CaptureWindow" />
+                                    <ComboBoxItem x:Name="VideoDeviceSourceItem" Content="{t:T 'Video capture device'}" Tag="VideoDevice" />
                                 </ComboBox>
                             </StackPanel>
                             <TextBlock x:Name="XboxWindowHint" Style="{StaticResource HintText}" TextWrapping="Wrap" Margin="0,12,0,0"
@@ -721,6 +722,10 @@
                             </StackPanel>
                             <TextBlock x:Name="WindowSourceHint" Style="{StaticResource HintText}" TextWrapping="Wrap" Margin="0,12,0,0"
                                        Text="{t:T 'Play in PS Remote Play or chiaki-ng on this PC; CouchSubs reads only that window, so no second account is needed. Show the subtitles on the computer screen.'}" />
+                            <StackPanel x:Name="VideoDevicePanel" Margin="0,12,0,0" Visibility="Collapsed">
+                                <TextBlock Text="{t:T 'Enter the DirectShow device name. FFmpeg must be available on PATH.'}" TextWrapping="Wrap" />
+                                <TextBox x:Name="VideoDeviceName" Margin="0,6,0,0" LostKeyboardFocus="OnVideoDeviceNameChanged" />
+                            </StackPanel>
                             <StackPanel x:Name="CaptureWindowPanel" Margin="0,12,0,0" Visibility="Collapsed">
                                 <TextBlock Text="{t:T 'Open an OBS projector or game window, then select it below. Only that window is read: CouchSubs never switches to the whole desktop when it closes.'}"
                                            Style="{StaticResource HintText}" TextWrapping="Wrap" Margin="0,0,0,8" />

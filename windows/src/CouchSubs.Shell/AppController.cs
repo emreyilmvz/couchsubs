@@ -167,7 +167,7 @@ public sealed class AppController : INotifyPropertyChanged, IDisposable
         var paired = tv is not null && store.Load<string>(StoreKeys.TvKey) is not null;
         // Remote Play penceresinden okurken PS5 eşleşmesi gerekmez.
         var consoleReady = consoleKind == GameConsoleKind.Xbox ? xboxToken is not null && xboxConsole is not null : accountId is not null && console is not null;
-        var ready = ReadsRemotePlayWindow || ReadsCaptureWindow || SetupIsComplete(store, consoleReady, paired);
+        var ready = ReadsRemotePlayWindow || ReadsCaptureWindow || ReadsVideoDevice || SetupIsComplete(store, consoleReady, paired);
         // Yarım kalan kurulum (ör. TV uygulaması kurulurken kapatıldı) PS5 kayıtlıysa TV adımından sürer.
         step = ready ? OnboardingStep.Done : consoleReady ? OnboardingStep.Tv : OnboardingStep.Welcome;
         AttachServer();
@@ -407,7 +407,7 @@ public sealed class AppController : INotifyPropertyChanged, IDisposable
     public GameConsoleKind ConsoleKind => consoleKind;
     public bool ConsoleKindLocked => consoleKindLocked;
     public bool IsXbox => consoleKind == GameConsoleKind.Xbox;
-    public string ConsoleTitle => demoMode ? text["Demo mode"] : ReadsCaptureWindow ? text["Selected window"] : IsXbox ? "Xbox" : "PS5";
+    public string ConsoleTitle => demoMode ? text["Demo mode"] : ReadsCaptureWindow ? text["Selected window"] : ReadsVideoDevice ? settings.VideoDeviceName : IsXbox ? "Xbox" : "PS5";
     /// <summary>
     /// Xbox seçili ve görüntü seçilen OBS/oyun penceresinden okunuyor (#853): oyun Xbox uygulamasında, play.xbox.com'da ya
     /// da capture card ile OBS'te oynanır; CouchSubs Xbox'a bağlanmaz (Xbox aynı anda tek bağlantıya izin verir), Microsoft
@@ -415,6 +415,7 @@ public sealed class AppController : INotifyPropertyChanged, IDisposable
     /// </summary>
     public bool XboxReadsWindow => IsXbox && settings.XboxFrameSource == XboxFrameSource.CaptureWindow;
     /// <summary>Görüntü seçilen OBS/oyun penceresinden okunuyor (PS5'te ya da Xbox'ta).</summary>
+    private bool ReadsVideoDevice => !IsXbox && settings.FrameSource == FrameSource.VideoDevice;
     private bool ReadsCaptureWindow => IsXbox ? XboxReadsWindow : settings.FrameSource == FrameSource.CaptureWindow;
     /// <summary>Görüntü bu bilgisayardaki PS Remote Play / chiaki-ng penceresinden okunuyor (yalnız PS5).</summary>
     private bool ReadsRemotePlayWindow => !IsXbox && settings.FrameSource == FrameSource.RemotePlayWindow;
@@ -428,6 +429,7 @@ public sealed class AppController : INotifyPropertyChanged, IDisposable
         {
             FrameSource.RemotePlayWindow => "Remote Play window on this PC",
             FrameSource.CaptureWindow => "OBS projector or game window",
+            FrameSource.VideoDevice => "Video capture device",
             _ => "The PS5 (second account)",
         }];
     public bool HasXboxAccount => xboxToken is not null;
@@ -608,6 +610,7 @@ public sealed class AppController : INotifyPropertyChanged, IDisposable
     }
     public string Ps5StatusText => demoMode ? text["Sample pictures"]
         : ReadsCaptureWindow ? CaptureWindowStatusText(sessionState, isRunning, text, settings.CaptureWindow)
+        : ReadsVideoDevice ? StatusText(sessionState, isRunning, text, settings.VideoDeviceName)
         : IsXbox ? XboxStatusText()
         : ReadsRemotePlayWindow ? WindowStatusText(sessionState, isRunning, text, installed: !RemotePlayMissing)
                 : StatusText(sessionState, isRunning, text, console is null ? null : string.IsNullOrEmpty(console.Name) ? "PS5" : console.Name,
@@ -695,6 +698,7 @@ public sealed class AppController : INotifyPropertyChanged, IDisposable
     /// <summary>Görüntü kaynağı hazır ve altyazının gideceği bir yer var.</summary>
     public bool CanStart => (ReadsCaptureWindow ? settings.CaptureWindow is { ProcessName.Length: > 0, Title.Length: > 0 }
                             : IsXbox ? xboxToken is not null && xboxConsole is not null
+                            : ReadsVideoDevice ? !string.IsNullOrWhiteSpace(settings.VideoDeviceName)
                             : settings.FrameSource == FrameSource.RemotePlayWindow
                               || settings.FrameSource == FrameSource.Ps5 && console is not null && accountId is not null)
                             && settings.Output.HasDestination(HasTv);
@@ -797,18 +801,19 @@ public sealed class AppController : INotifyPropertyChanged, IDisposable
             if (old.ActiveAreaProfile != value.ActiveAreaProfile || old.AreaProfiles != value.AreaProfiles || old.Areas != value.Areas
                 || old.FrameSource != value.FrameSource)
                 Changed(nameof(AreaProfileGame), nameof(AreaProfileUnsaved), nameof(AreaProfileTarget), nameof(GameProfiles));
-            if (old.FrameSource != value.FrameSource || old.XboxFrameSource != value.XboxFrameSource || old.CaptureWindow != value.CaptureWindow)
+            if (old.FrameSource != value.FrameSource || old.XboxFrameSource != value.XboxFrameSource || old.CaptureWindow != value.CaptureWindow || old.VideoDeviceName != value.VideoDeviceName)
                 Changed(nameof(CanStart), nameof(Ps5StatusText), nameof(ConsoleTitle), nameof(PictureSourceTitle), nameof(XboxReadsWindow),
                     nameof(NeedsXboxLink));
             var windowAppChanged = ReadsRemotePlayWindow && old.RemotePlayApp != value.RemotePlayApp;
             var captureWindowChanged = ReadsCaptureWindow && old.CaptureWindow != value.CaptureWindow;
+            var videoDeviceChanged = ReadsVideoDevice && old.VideoDeviceName != value.VideoDeviceName;
             var xboxFrameRateChanged = IsXbox && !XboxReadsWindow && old.XboxLegacyFrameRate != value.XboxLegacyFrameRate;
             // Xbox sesi: oturum yeniden kurulmaz, yalnız yerel ses açılır/kısılır (pencereden okurken oturum sesi yoktur,
             // çağrı bir şey yapmaz). Eskiden akış kapatılıp hemen yeniden açılıyordu; Xbox eski oturumu bırakmadan gelen
             // yeni istekte hizmetini başlatamıyor, bağlantı geri gelmiyordu (#871).
             if (old.XboxAudioOnComputer != value.XboxAudioOnComputer) session?.SetPlayAudio(value.XboxAudioOnComputer);
             var sourceChanged = IsXbox ? old.XboxFrameSource != value.XboxFrameSource : old.FrameSource != value.FrameSource;
-            if (isRunning && (sourceChanged || windowAppChanged || captureWindowChanged || xboxFrameRateChanged))
+            if (isRunning && (sourceChanged || windowAppChanged || captureWindowChanged || videoDeviceChanged || xboxFrameRateChanged))
             {
                 // Görüntü kaynağı ya da Xbox kare aralığı değişti: akış yeni seçimle yeniden başlar.
                 // TV uygulaması kapatılmaz; kapanıp yeniden açılsa TV girişi gidip gelirdi.
@@ -2086,7 +2091,8 @@ public sealed class AppController : INotifyPropertyChanged, IDisposable
         var readsWindow = !demoMode && ReadsRemotePlayWindow;
         // Xbox'ta da seçilen pencere okunabilir (#853): o zaman Xbox'a hiç bağlanılmaz.
         var readsCapture = !demoMode && ReadsCaptureWindow;
-        if (!demoMode && !IsXbox && !readsWindow && !readsCapture && (console is null || accountId is null)) return;
+        var readsVideoDevice = !demoMode && ReadsVideoDevice;
+        if (!demoMode && !IsXbox && !readsWindow && !readsCapture && !readsVideoDevice && (console is null || accountId is null)) return;
         IsStarting = true;
         try
         {
@@ -2109,7 +2115,7 @@ public sealed class AppController : INotifyPropertyChanged, IDisposable
             if (settings.Dubbing.Enabled && DubbingInstalled) MakeDubber()?.Prepare();
             SubtitleLog.Write($"oturum başladı: {settings.SourceLanguage}→{settings.TargetLanguage}, "
                 + $"motor: {(OnlineTranslationActive ? settings.OnlineEngine.ToString() : "ücretsiz")}, seçilen motor: {settings.Engine}, paketler: {(settings.GamePacks ? "açık" : "kapalı")}, "
-                + $"görüntü: {(demoMode ? "deneme modu" : readsCapture ? IsXbox ? "seçilen pencere (Xbox, bağlanılmaz)" : "seçilen pencere" : IsXbox ? "Xbox" : readsWindow ? "Remote Play penceresi" : "PS5")}");
+                + $"görüntü: {(demoMode ? "deneme modu" : readsCapture ? IsXbox ? "seçilen pencere (Xbox, bağlanılmaz)" : "seçilen pencere" : IsXbox ? "Xbox" : readsWindow ? "Remote Play penceresi" : readsVideoDevice ? "video yakalama aygıtı" : "PS5")}");
 
             IStreamSession stream;
             if (demoMode)
@@ -2134,12 +2140,16 @@ public sealed class AppController : INotifyPropertyChanged, IDisposable
                 RemotePlayLog.Note($"Çeviri başladı; seçilen pencere: {target.ProcessName} / {target.Title}");
                 stream = services.MakeCaptureWindowStream(target);
             }
+            else if (readsVideoDevice)
+            {
+                stream = services.MakeVideoDeviceStream(settings.VideoDeviceName);
+            }
             else
             {
                 RemotePlayLog.Note($"Çeviri başladı; PS5'e bağlanılıyor: {console!.Name} {console.Host}");
                 stream = MakeConsoleStream();
             }
-            sessionIsConsole = !demoMode && !readsWindow && !readsCapture;
+            sessionIsConsole = !demoMode && !readsWindow && !readsCapture && !readsVideoDevice;
             Attach(stream);
             // Oturum başlamadan atanır: bağlanır bağlanmaz gelen durum "eski oturumun" sayılıp atılmasın (bkz. Attach).
             session = stream;
@@ -2199,7 +2209,7 @@ public sealed class AppController : INotifyPropertyChanged, IDisposable
     /// doğrudan okunup yalnız TV'ye gönderiliyorsa ekran kendi ayarıyla kapanabilir.
     /// </summary>
     private bool KeepsDisplayOn =>
-        ReadsRemotePlayWindow || ReadsCaptureWindow || ShowsOnComputer;
+        ReadsRemotePlayWindow || ReadsCaptureWindow || ReadsVideoDevice || ShowsOnComputer;
 
     private void OutputChanged()
     {
